@@ -32,8 +32,13 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
     origin: allowedOrigins,
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Handle preflight requests for all routes
+app.options('*', cors());
 
 // Serve uploaded files statically
 const path = require('path');
