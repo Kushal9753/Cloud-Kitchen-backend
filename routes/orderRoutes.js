@@ -1,6 +1,40 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const Review = require('../models/Review');
+const Food = require('../models/Food');
+const { protect } = require('../middleware/auth');
+
+// Helper function to update food average rating
+const updateFoodRatings = async (foodRatings) => {
+    for (const rating of foodRatings) {
+        if (!rating.food) continue;
+
+        // Convert to ObjectId for proper matching
+        const foodId = new mongoose.Types.ObjectId(rating.food);
+
+        // Get all ratings for this food from reviews
+        const allRatings = await Review.aggregate([
+            { $unwind: '$foodRatings' },
+            { $match: { 'foodRatings.food': foodId } },
+            {
+                $group: {
+                    _id: '$foodRatings.food',
+                    avgRating: { $avg: '$foodRatings.rating' },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        if (allRatings.length > 0) {
+            await Food.findByIdAndUpdate(rating.food, {
+                avgRating: Math.round(allRatings[0].avgRating * 10) / 10,
+                ratingCount: allRatings[0].count
+            });
+        }
+    }
+};
 
 // Place Order
 router.post('/', async (req, res) => {
@@ -148,6 +182,88 @@ router.delete('/:id', async (req, res) => {
         await Order.findByIdAndDelete(req.params.id);
 
         res.json({ message: 'Order deleted successfully', orderId: req.params.id });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Rate Order (User only - for delivered orders)
+router.post('/:id/rate', protect, async (req, res) => {
+    try {
+        const { rating, reviewText } = req.body;
+
+        // Validation: Rating must be between 1 and 5
+        if (!rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+        }
+
+        const order = await Order.findById(req.params.id);
+
+        // Check if order exists
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Check if user owns this order
+        if (order.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized to rate this order' });
+        }
+
+        // Check if order is delivered
+        if (order.status !== 'Delivered') {
+            return res.status(400).json({ message: 'Can only rate delivered orders' });
+        }
+
+        // Check if already rated
+        if (order.hasReview) {
+            return res.status(400).json({ message: 'Order already rated' });
+        }
+
+        // Update rating
+        // Create Review Document 
+        // Map order items to foodRatings (applying overall rating to each item as default)
+        const foodRatings = order.items.map(item => ({
+            food: item.food,
+            foodName: item.name,
+            rating: rating,
+            comment: reviewText
+        }));
+
+        const review = new Review({
+            order: order._id,
+            user: req.user._id,
+            foodRatings: foodRatings,
+            deliveryRating: rating, // Defaulting delivery rating to overall rating
+            overallRating: rating,
+            comment: reviewText
+        });
+
+        await review.save();
+        await updateFoodRatings(foodRatings);
+
+        // Update Order
+        order.rating = rating;
+        order.reviewText = reviewText || '';
+        order.hasReview = true;
+        order.ratedAt = Date.now();
+        await order.save();
+
+        // Emit socket event for real-time review updates (for Admin Reviews page)
+        // We structure this to match what Reviews.jsx expects (Review model structure)
+        const io = req.app.get('io');
+        // Populate user and order data for the socket event
+        const populatedReview = await Review.findById(review._id)
+            .populate('user', 'name email')
+            .populate('order', 'orderNumber totalAmount')
+            .populate('foodRatings.food', 'name');
+
+        io.emit('new_rating', populatedReview);
+
+        res.status(200).json({
+            message: 'Rating submitted successfully',
+            order,
+            review // Return the review as well
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

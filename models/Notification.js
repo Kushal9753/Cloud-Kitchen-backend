@@ -31,6 +31,11 @@ const notificationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }],
+    // Track users who have deleted/hidden this notification (for global messages)
+    deletedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
     // For individual notifications
     isRead: {
         type: Boolean,

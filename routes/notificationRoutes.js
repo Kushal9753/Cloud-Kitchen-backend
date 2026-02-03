@@ -17,9 +17,10 @@ router.get('/', protect, async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(50);
 
-        // Get global notifications
+        // Get global notifications (that haven't been deleted by this user)
         const globalNotifications = await Notification.find({
-            isGlobal: true
+            isGlobal: true,
+            deletedBy: { $ne: userId }
         })
             .populate('sender', 'name')
             .sort({ createdAt: -1 })
@@ -67,10 +68,11 @@ router.get('/unread-count', protect, async (req, res) => {
             isRead: false
         });
 
-        // Count unread global notifications (not in readBy array)
+        // Count unread global notifications (not in readBy array AND not in deletedBy array)
         const unreadGlobal = await Notification.countDocuments({
             isGlobal: true,
-            readBy: { $ne: userId }
+            readBy: { $ne: userId },
+            deletedBy: { $ne: userId }
         });
 
         res.json({ count: unreadIndividual + unreadGlobal });
@@ -137,6 +139,43 @@ router.put('/read-all', protect, async (req, res) => {
         res.json({ message: 'All notifications marked as read' });
     } catch (error) {
         console.error('Error marking all as read:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Delete a notification
+router.delete('/:id', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const notification = await Notification.findById(req.params.id);
+
+        if (!notification) {
+            return res.status(404).json({ message: 'Notification not found' });
+        }
+
+        if (notification.isGlobal) {
+            // Global: Add to deletedBy array for this user (Soft Delete)
+            // Initialize deletedBy if it doesn't exist (for old records)
+            if (!notification.deletedBy) {
+                notification.deletedBy = [];
+            }
+
+            if (!notification.deletedBy.includes(userId)) {
+                notification.deletedBy.push(userId);
+                await notification.save();
+            }
+            return res.json({ message: 'Notification removed' });
+        } else {
+            // Individual: Verify ownership then Hard Delete
+            if (notification.receiver.toString() !== userId.toString()) {
+                return res.status(403).json({ message: 'Not authorized to delete this notification' });
+            }
+
+            await Notification.findByIdAndDelete(req.params.id);
+            return res.json({ message: 'Notification deleted' });
+        }
+    } catch (error) {
+        console.error('Error deleting notification:', error);
         res.status(500).json({ message: error.message });
     }
 });

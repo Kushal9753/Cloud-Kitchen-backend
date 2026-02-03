@@ -125,6 +125,21 @@ const orderSchema = new mongoose.Schema({
     hasReview: {
         type: Boolean,
         default: false
+    },
+
+    // Rating (1-5 stars)
+    rating: {
+        type: Number,
+        min: 1,
+        max: 5
+    },
+    reviewText: {
+        type: String,
+        trim: true,
+        maxlength: 500
+    },
+    ratedAt: {
+        type: Date
     }
 }, {
     timestamps: true
