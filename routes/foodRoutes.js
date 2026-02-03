@@ -1,37 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const Food = require('../models/Food');
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/');
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-        cb(null, true);
-    } else {
-        cb(new Error('Only image files are allowed!'), false);
-    }
-};
-
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-    fileFilter: fileFilter
-});
+const upload = require('../middleware/uploadMiddleware');
+const cloudinary = require('../config/cloudinary');
 
 // Get All Food Items
 router.get('/', async (req, res) => {
@@ -43,17 +16,59 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Upload Image
+// Upload Image to Cloudinary
 router.post('/upload', upload.single('image'), async (req, res) => {
     try {
+        console.log('Food Image Upload Request Received');
+
         if (!req.file) {
+            console.error('No file received by Multer');
             return res.status(400).json({ message: 'No file uploaded' });
         }
-        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
-        res.json({ imageUrl });
+
+        console.log('File received locally:', req.file);
+
+        // Ensure path is absolute
+        const localFilePath = path.resolve(req.file.path);
+        console.log('Processing upload for file:', localFilePath);
+
+        // Upload to Cloudinary
+        const result = await cloudinary.uploader.upload(localFilePath, {
+            folder: 'food-delivery-app/food-items',
+            resource_type: 'image'
+        });
+
+        console.log('Cloudinary Upload Success:', result);
+
+        // Delete local file after successful upload
+        fs.unlink(localFilePath, (err) => {
+            if (err) {
+                console.error('Failed to delete local file:', err);
+            } else {
+                console.log('Successfully deleted local file:', localFilePath);
+            }
+        });
+
+        // Return the Cloudinary URL
+        res.json({
+            imageUrl: result.secure_url,
+            publicId: result.public_id
+        });
+
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Upload Process Failed:', error);
+
+        // Attempt to delete file if upload failed
+        if (req.file && req.file.path) {
+            fs.unlink(req.file.path, (unlinkErr) => {
+                if (unlinkErr) console.error('Failed to delete local file after error:', unlinkErr);
+            });
+        }
+
+        res.status(500).json({
+            message: 'Server error during upload',
+            error: error.message
+        });
     }
 });
 

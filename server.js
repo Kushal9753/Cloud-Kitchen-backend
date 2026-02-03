@@ -40,9 +40,9 @@ app.use(cors({
 // Handle preflight requests for all routes
 app.options('*', cors());
 
-// Serve uploaded files statically
-const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Static file serving for uploads removed - all images now served from Cloudinary
+// const path = require('path');
+// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database Connection
 const connectDB = async () => {
@@ -81,6 +81,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/coupons', require('./routes/couponRoutes'));
 app.use('/api/delivery', require('./routes/deliveryRoutes'));
 app.use('/api/config', require('./routes/configRoutes'));
+app.use('/api/upload', require('./routes/uploadRoutes'));
 
 app.get('/', (req, res) => {
     res.send('API is running...');
