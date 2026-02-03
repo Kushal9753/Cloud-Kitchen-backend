@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
+const compression = require('compression');
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ const io = new Server(httpServer, {
 });
 
 // Middleware
+app.use(compression());
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
