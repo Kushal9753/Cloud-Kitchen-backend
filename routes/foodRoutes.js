@@ -76,6 +76,21 @@ router.post('/upload', upload.single('image'), async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { name, description, price, image, category, type } = req.body;
+
+        // STRICT VALIDATION: Reject local /uploads URLs
+        if (image && image.includes('/uploads/')) {
+            return res.status(400).json({
+                message: 'Local image URLs are not allowed. Please upload images via the admin panel.'
+            });
+        }
+
+        // STRICT VALIDATION: Enforce Cloudinary-only URLs (if image provided)
+        if (image && image.trim() !== '' && !image.startsWith('https://res.cloudinary.com/')) {
+            return res.status(400).json({
+                message: 'Only Cloudinary image URLs are allowed. Please upload images via the admin panel.'
+            });
+        }
+
         const food = new Food({ name, description, price, image, category, type });
         const createdFood = await food.save();
         res.status(201).json(createdFood);
@@ -88,6 +103,21 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { name, description, price, image, category, type } = req.body;
+
+        // STRICT VALIDATION: Reject local /uploads URLs
+        if (image && image.includes('/uploads/')) {
+            return res.status(400).json({
+                message: 'Local image URLs are not allowed. Please upload images via the admin panel.'
+            });
+        }
+
+        // STRICT VALIDATION: Enforce Cloudinary-only URLs (if image provided)
+        if (image && image.trim() !== '' && !image.startsWith('https://res.cloudinary.com/')) {
+            return res.status(400).json({
+                message: 'Only Cloudinary image URLs are allowed. Please upload images via the admin panel.'
+            });
+        }
+
         const food = await Food.findById(req.params.id);
         if (food) {
             food.name = name || food.name;
