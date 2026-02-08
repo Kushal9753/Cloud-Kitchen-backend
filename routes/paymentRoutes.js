@@ -91,8 +91,7 @@ router.post('/process', protect, async (req, res) => {
             }
         }
 
-        // Simulate payment processing delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Payment processing - removed artificial delay for better performance
 
         // Create payment record
         const payment = await Payment.create({

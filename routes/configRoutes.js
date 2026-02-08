@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const SystemConfig = require('../models/SystemConfig');
 
-// GET config
+// GET config - with caching for better performance
 router.get('/', async (req, res) => {
     try {
         const config = await SystemConfig.getConfig();
+        // Cache config for 5 minutes (rarely changes)
+        res.set('Cache-Control', 'public, max-age=300');
         res.json(config);
     } catch (error) {
         console.error(error);
