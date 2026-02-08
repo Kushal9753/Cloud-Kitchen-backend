@@ -125,10 +125,29 @@ router.post('/process', protect, async (req, res) => {
         // Emit socket event for admin notification
         const io = req.app.get('io');
         if (io) {
+            // Emit properly structured order object for frontend
             io.emit('new_order', {
-                order: order,
-                payment: payment,
-                message: `New order from ${user.name}!`
+                _id: order._id,
+                orderNumber: order.orderNumber,
+                customerName: order.customerName,
+                customerPhone: order.customerPhone,
+                customerEmail: order.customerEmail,
+                items: order.items,
+                subtotal: order.subtotal,
+                deliveryFee: order.deliveryFee,
+                discount: order.discount,
+                totalAmount: order.totalAmount,
+                status: order.status,
+                isPaid: order.isPaid,
+                paymentMethod: order.paymentMethod,
+                deliveryAddress: order.deliveryAddress,
+                createdAt: order.createdAt,
+                user: order.user,
+                payment: {
+                    method: payment.method,
+                    status: payment.status,
+                    gatewayPaymentId: payment.gatewayPaymentId
+                }
             });
         }
 

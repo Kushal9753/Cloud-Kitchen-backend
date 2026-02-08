@@ -6,10 +6,18 @@ const Food = require('../models/Food');
 const upload = require('../middleware/uploadMiddleware');
 const cloudinary = require('../config/cloudinary');
 
-// Get All Food Items
+// Get All Food Items (with optional category filter)
 router.get('/', async (req, res) => {
     try {
-        const foods = await Food.find({});
+        const { category } = req.query;
+
+        // Build filter object
+        const filter = {};
+        if (category && category !== 'all') {
+            filter.category = category;
+        }
+
+        const foods = await Food.find(filter);
         res.json(foods);
     } catch (error) {
         res.status(500).json({ message: error.message });
