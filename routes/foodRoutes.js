@@ -110,7 +110,7 @@ router.post('/', async (req, res) => {
 // Update Food Item (Admin)
 router.put('/:id', async (req, res) => {
     try {
-        const { name, description, price, image, category, type } = req.body;
+        const { name, description, price, image, category, type, discountType, discountValue } = req.body;
 
         // STRICT VALIDATION: Reject local /uploads URLs
         if (image && image.includes('/uploads/')) {
@@ -128,18 +128,25 @@ router.put('/:id', async (req, res) => {
 
         const food = await Food.findById(req.params.id);
         if (food) {
-            food.name = name || food.name;
-            food.description = description || food.description;
-            food.price = price || food.price;
-            food.image = image || food.image;
-            food.category = category || food.category;
-            food.type = type || food.type;
+            // Update fields if they are provided in the request
+            if (name !== undefined) food.name = name;
+            if (description !== undefined) food.description = description;
+            if (price !== undefined) food.price = price;
+            if (image !== undefined) food.image = image;
+            if (category !== undefined) food.category = category;
+            if (type !== undefined) food.type = type;
+
+            // Update discount fields
+            if (discountType !== undefined) food.discountType = discountType;
+            if (discountValue !== undefined) food.discountValue = discountValue;
+
             const updatedFood = await food.save();
             res.json(updatedFood);
         } else {
             res.status(404).json({ message: 'Food not found' });
         }
     } catch (error) {
+        console.error('Error updating food:', error);
         res.status(500).json({ message: error.message });
     }
 });
